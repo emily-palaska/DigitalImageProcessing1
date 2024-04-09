@@ -24,18 +24,18 @@ def get_equalization_transform_of_img(img_array):
 def perform_global_hist_equalization(img_array):
     T = get_equalization_transform_of_img(img_array)
     equalized_img = T[img_array]
-    return equalized_img.astype(int)
+    return equalized_img.astype(np.uint8)
     
 # Load the image
-img = Image.open("input_img.png").convert('L')
+img1 = Image.open("input_img.png").convert('L')
 # Convert the image to a NumPy uint8 array
-img_array = np.array(img).astype(np.uint8)
-img1 = Image.fromarray(img_array)
+img_array = np.array(img1).astype(np.uint8)
+
 # Perform equalization
 equalized_img = perform_global_hist_equalization(img_array)
 
+# Save results locally
 img2 = Image.fromarray(equalized_img)
-
 img1.save("img1.png")
 img2.save("img2.png")
 
