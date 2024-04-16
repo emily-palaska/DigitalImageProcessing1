@@ -2,7 +2,7 @@
 import numpy as np
 import matplotlib.pyplot as plt
 
-def my_hist(data, bins=10, filename='hist.png'):
+def my_hist(data, bins=256, filename='hist.png'):
     # Make array 1d
     data_flat = data.flatten()
 
