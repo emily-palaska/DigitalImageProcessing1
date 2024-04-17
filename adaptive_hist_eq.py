@@ -1,74 +1,100 @@
-from PIL import Image
 import numpy as np
-import matplotlib.pyplot as plt
 from global_hist_eq import get_equalization_transform_of_img
-from global_hist_eq import my_hist
 
 def calculate_eq_transformations_of_regions(img_array, region_len_h, region_len_w):
-    # Initialize the dictioany
-    region_to_eq_transform = {}
-
-    # Iterate all contextual regions and add their transformation to the dictionary
-    for h in range(img_array.shape[0] // region_len_h):
-        h1 = h * region_len_h
-        h2 = (h + 1) * region_len_h
-        for w in range(img_array.shape[1] // region_len_w):
-            w1 = w * region_len_w
-            w2 = (w + 1) * region_len_w
-            region_to_eq_transform[(h, w)] = get_equalization_transform_of_img(img_array[h1:h2, w1:w2])
+# Function that creates a dictinary of transformations for every contextual region of an image
+#  Input:
+#   img_array: a numpy array of a uint8 grayscale image
+#   region_len_h: the region length for the first dimension
+#   region_len_w: the region length for the second dimension
+#  Output:
+#   region_to_eq_tranform: a dictinary that matches every contextual region to its equalization transformation
     
-    return region_to_eq_transform
-
-def perform_adaptive_hist_equalization(img_array, region_len_h, region_len_w):
-    # Get image size, initialize equalized image and calculate number of contextual regions
+    # Initialize the output
+    region_to_eq_transform = {}
+    
+    # Get the image size and calculate range of iteration
     m, n = img_array.shape
-    equalized_img = np.zeros((m, n)).astype(np.uint8)
     h_range = m // region_len_h
     w_range = n // region_len_w
 
-    # Retrive the dictionary connecting every contexual region to the corresponding equalization transformation 
+    # Iterate all contextual regions and add their transformation to the dictionary
+    # If the image is not perfectly dividable by the region lengths, then the last contextual regions of
+    # each dimension get the remaining pixels
+    for h in range(h_range):
+        h1 = h * region_len_h
+        h2 = m - 1 if h == h_range - 1 else (h + 1) * region_len_h
+        for w in range(w_range):
+            w1 = w * region_len_w
+            w2 = n - 1 if w == w_range - 1 else (w + 1) * region_len_w
+            region_to_eq_transform[(h, w)] = get_equalization_transform_of_img(img_array[h1:h2, w1:w2])
+    return region_to_eq_transform
+
+def perform_adaptive_hist_equalization(img_array, region_len_h, region_len_w):
+# Function that perfroms the adaptive equalization technique to an image
+#  Input:
+#   img_array: a numpy array of a uint8 grayscale image
+#   region_len_h: the region length for the first dimension
+#   region_len_w: the region length for the second dimension
+#  Output:
+#    equalized_img: the resulting image as in uint8 numpy array
+    
+    # Initialize the output
+    equalized_img = img_array.copy()
+    
+    # Get the image size and calculate number (range) of contextual regions
+    m, n = img_array.shape
+    h_range = m // region_len_h
+    w_range = n // region_len_w
+
+    # Retrieve the dictionary connecting every contexual region to the corresponding equalization transformation
     region_to_eq_transform = calculate_eq_transformations_of_regions(img_array, region_len_h, region_len_w)
 
+     # Fill outer contextual regions without performing interpolation
+    for h in range(h_range):
+        h1 = h * region_len_h
+        h2 = m - 1 if h == h_range - 1 else (h + 1) * region_len_h
+        for w in range(w_range):
+            w1 = w * region_len_w
+            w2 = n - 1 if w == w_range - 1 else (w + 1) * region_len_w
+            if h == 0 or w == 0 or h == h_range - 1 or w == w_range - 1:
+                T = region_to_eq_transform[(h, w)]
+                equalized_img[h1:h2, w1:w2] = T[img_array[h1:h2, w1:w2]]
+    
+    # Get the region lengths halves for later computations            
+    region_len_h_half = region_len_h // 2
+    region_len_w_half = region_len_w // 2
+    
     # Fill inner contextual regions by iterating all the pixels and interpolating all the neighboring transformations
-    for hp in range(region_len_h, (h_range - 1) * region_len_h):
-        for wp in range(region_len_w, (w_range - 1) * region_len_w):
+    for hp in range(region_len_h_half, h_range * region_len_h - region_len_h_half):
+        for wp in range(region_len_w // 2, w_range * region_len_w - region_len_w // 2):
             # Find nearest region center
-            hc = (hp // region_len_h) * region_len_h - region_len_h // 2 
-            wc = (wp // region_len_w) * region_len_w - region_len_w // 2
-            if hp - hc >= region_len_h: hc += region_len_h
-            if wp - wc > region_len_w: wc += region_len_w
+            hc = (hp // region_len_h_half) * region_len_h_half
+            wc = (wp // region_len_w_half) * region_len_w_half
+            if hc % region_len_h == 0: hc -= region_len_h_half
+            if wc % region_len_w == 0: wc -= region_len_w_half
 
+            # Calculate the interpolation prameters
             a = (wp - wc) / region_len_w
             b = (hp - hc) / region_len_h
             
-            # Find corresponing coordinates for dictinary retrieval
+            # Find corresponing coordinates for dictionary retrieval
             h = hc // region_len_h
             w = wc // region_len_w
-            if hp == 90  and wp == 120:
-                print(h,w)
+
+            # Get the corresponding transformations
             Tmm = region_to_eq_transform[(h, w)]
             Tmp = region_to_eq_transform[(h, w + 1)]
             Tpm = region_to_eq_transform[(h + 1, w)]
             Tpp = region_to_eq_transform[(h + 1, w + 1)]
 
-            equalized_img[hp, wp] = (1 - a) * (1 - b) * Tmm[img_array[hp, wp]]
-            equalized_img[hp, wp] += (1 - a) * b * Tpm[img_array[hp, wp]] 
-            equalized_img[hp, wp] += a * (1 - b) * Tmp[img_array[hp, wp]]
-            equalized_img[hp, wp] += a * b * Tpp[img_array[hp, wp]]
-    
-     # Fill outer contextual regions without performing interpolation
-    for h in range(h_range):
-        h1 = h * region_len_h
-        h2 = (h + 1) * region_len_h
-        for w in range(w_range):
-            w1 = w * region_len_w
-            w2 = (w + 1) * region_len_w
-            if h == 0 or w == 0 or h == h_range - 1 or w == w_range - 1:
-                T = region_to_eq_transform[(h, w)]
-                equalized_img[h1:h2, w1:w2] = T[img_array[h1:h2, w1:w2]]
-    
-    # Return image cropped accordingly
-    return equalized_img[0 : m - m%region_len_h, 0 : n - n%region_len_w]
+            # Perfrom the interpolation with auxiliary buffer
+            buffer = (1 - a) * (1 - b) * Tmm[img_array[hp, wp]]
+            buffer += (1 - a) * b * Tpm[img_array[hp, wp]]
+            buffer += a * (1 - b) * Tmp[img_array[hp, wp]]
+            buffer += a * b * Tpp[img_array[hp, wp]]
+            equalized_img[hp, wp] = buffer
+    return equalized_img
 
 # Example usage
 

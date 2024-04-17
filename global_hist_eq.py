@@ -1,61 +1,40 @@
-#from PIL import Image
 import numpy as np
-import matplotlib.pyplot as plt
 
-def my_hist(data, bins=256, filename='hist.png'):
-    # Make array 1d
-    data_flat = data.flatten()
+def get_equalization_transform_of_img(img_array):
 
-    # Find minimum and maximum values in the data
-    min_val = np.min(data_flat)
-    max_val = np.max(data_flat)
-
-    # Calculate bin width
-    bin_width = (max_val - min_val) / bins
-
-    # Initialize histogram counts
-    hist_counts = np.zeros(bins, dtype=int)
-
-    # Iterate through data and count occurrences in each bin
-    for value in data_flat:
-        bin_index = int((value - min_val) // bin_width)
-        if bin_index == bins:  # Handle values equal to max_val
-            bin_index -= 1
-        hist_counts[bin_index] += 1
-
-    # Plot and save histogram
-    bin_edges = np.linspace(min_val, max_val, bins + 1)
-    plt.bar(bin_edges[:-1], hist_counts, width=bin_width, edgecolor='blue')
-    plt.xlabel('Value')
-    plt.ylabel('Frequency')
-    plt.title('Histogram')
-    plt.savefig(filename)
-    plt.close()
-
-def get_equalization_transform_of_img(img_array): 
-    # Get image dimensions
-    n1, n2 = img_array.shape
-    # Define unique values number based on uint8 dtype
-    L = 256
-    equalization_transform = np.zeros(L)
-
-    # Turn array to 1d for ease of use
+#Function that calculates the equaliation transfrom of an image
+#  Input:
+#   img_array: a numpy array of a uint8 grayscale image
+#  Output:
+#   equalization_transform: the equlization tranformation
+    
+    # Initialize the output
+    equalization_transform = np.zeros(L)   
+     
+    # Flatten array for easy access
     img_flat = img_array.flatten()
     
+    # Define the number of unique values based on uint8 dtype
+    L = 256
+    
     # Find the probability of each value happening
-    p = np.bincount(img_flat, minlength=256) / (n1 * n2)
+    p = np.bincount(img_flat, minlength=L) / len(img_flat)
 
     # Find the u vector as the cumulative sum
     u = np.cumsum(p)
     
     # Calculate the equalization transform
-    equalization_transform = np.round((u - u[0]) * (L - 1) / (1 - u[0]))
+    equalization_transform = np.round(((u - u[0]) / (1 - u[0])) * (L - 1))
     return equalization_transform
 
 def perform_global_hist_equalization(img_array):
+# Function that performs the global equalization technique to an image
+#  Input:
+#   img_array: a numpy array of a uint8 grayscale image
+#  Output: The equalized image as a uint8 numpy array
+    
     T = get_equalization_transform_of_img(img_array)
-    equalized_img = T[img_array]
-    return equalized_img.astype(np.uint8)
+    return T[img_array].astype(np.uint8)
 
 # Example Usage
 
