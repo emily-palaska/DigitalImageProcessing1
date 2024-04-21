@@ -8,14 +8,14 @@ def get_equalization_transform_of_img(img_array):
 #  Output:
 #   equalization_transform: the equlization tranformation
     
+    # Define the number of unique values based on uint8 dtype
+    L = 256
+
     # Initialize the output
     equalization_transform = np.zeros(L)   
      
     # Flatten array for easy access
-    img_flat = img_array.flatten()
-    
-    # Define the number of unique values based on uint8 dtype
-    L = 256
+    img_flat = img_array.flatten()    
     
     # Find the probability of each value happening
     p = np.bincount(img_flat, minlength=L) / len(img_flat)
